@@ -1,3 +1,5 @@
+/*This is the server part of a time calibration system between server and smartphones.*/
+
 #include <stdio.h>
 #include <string.h>
 #include <stdlib.h>
