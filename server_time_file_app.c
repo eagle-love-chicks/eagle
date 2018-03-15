@@ -1,5 +1,4 @@
 /*This is the server part of a time calibration and files upload system between server and smartphones*/
-
 #include <stdio.h>
 #include <string.h>
 #include <stdlib.h>
@@ -43,33 +42,36 @@ void *connection_handler(void *socket_desc){
 			bzero(msgbody, PKTLEN);
 			fp = NULL;		
 			printf("Start to save files.\n");
-			while((read_size = recv(socket, msgbody, PKTLEN, 0)) > 0){
-
-				strcpy(backup, msgbody);
+			while((read_size = recv(socket, msgbody, PKTLEN/2, 0)) > 0){
+				//strcpy(backup, msgbody);
 				//printf("The second while: Receive Message:%s\n",msgbody);
 				done = 0;
-	
 				while(done==0){
 					printf("Enter third while: %s\n", msgbody);
+					bzero(backup, PKTLEN);
 					strcpy(backup, msgbody);				
 	
 					p = strtok(msgbody, "\n");
+					printf("split msgbody to p\n");
 					rows = 0;
 					while (p != NULL){
 						data[rows++] = p;
 						p = strtok (NULL, "\n");
 					}
+					printf("split finished\n");
 				
-					
+					printf("row: %d\n", rows);
+				
 					if(strcmp(data[rows-1],"endtx") != 0){
 						rows--;
 						if(rows == 0){
 							bzero(msgbody, PKTLEN);
-							if((read_size = recv(socket, msgbody, PKTLEN, 0)) > 0){
+							if((read_size = recv(socket, msgbody, PKTLEN/2, 0)) > 0){
 								flength = strlen(backup);
 								read_size = strlen(msgbody);
 								for(i=0; i<read_size; i++)
 									backup[flength+i] = msgbody[i];
+								bzero(msgbody,PKTLEN);
 								strcpy(msgbody, backup);
 							}
 							continue;
@@ -77,10 +79,13 @@ void *connection_handler(void *socket_desc){
 					}
 					else{
 						printf("Done == 1.\n");
-						done = 1;
-					}
-	
+						if(rows==1){
+							done = 1;
+							continue;
+						}
+					}	
 					printf("The number of rows is:%d\n", rows);
+					
 					for(eof = 0; eof < rows; eof++)
 						if(strcmp(data[eof],"eof") == 0)
 							break;
@@ -107,7 +112,7 @@ void *connection_handler(void *socket_desc){
 							printf("Cannot open the csv file for writing!");
 							exit(1);
 						}	
-					//	printf("The length of first row is:%d\n, data[1]:%s\n", flength,data[1]);
+						//printf("The length of first row is:%d\n, data[1]:%s\n", flength,data[1]);
 					}
 				
 					if(eof>0 && endtx>0 && flength==0)
@@ -120,6 +125,10 @@ void *connection_handler(void *socket_desc){
 						fclose(fp);
 						fp = NULL;
 						printf("End the processing of saving a file.\n");
+						if(endtx < rows && endtx == eof+1){
+							done = 1;
+							continue;
+						}
 					}
 
 					if(flength>0){
@@ -135,24 +144,29 @@ void *connection_handler(void *socket_desc){
 						backup[k] = backup[k+flength];
 					for(k=PKTLEN-flength; k<PKTLEN; k++)
 						backup[k] = '\0';
+					bzero(msgbody, PKTLEN);
 					strcpy(msgbody, backup);
 
 					if(eof==rows){
 						bzero(msgbody, PKTLEN);
-						if((read_size = recv(socket, msgbody, PKTLEN, 0)) > 0){
+						if((read_size = recv(socket, msgbody, PKTLEN/2, 0)) > 0){
 							flength = strlen(backup);
 							for(i=0; i<read_size; i++)
 								backup[flength+i] = msgbody[i];
+							bzero(msgbody, PKTLEN);
 							strcpy(msgbody, backup);
 						}
 						continue;
 					}
 				}	
-				bzero(msgbody, PKTLEN);
-				bzero(response, PKTLEN);
+
 				printf("All the files are saved");
 				strcat(response, "All the files are saved!\r\n");
 				write(socket, response, PKTLEN);
+				
+				bzero(msgbody, PKTLEN);
+				bzero(response, PKTLEN);
+
 				break;
 			}			
 		}
@@ -164,7 +178,7 @@ void *connection_handler(void *socket_desc){
 				p = strtok (NULL, ",");
 			}
 
-//			printf("\n%s\n",data[0]);
+			//printf("\n%s\n",data[0]);
 
 			if (strcmp(data[0],"timesync") == 0){
 				/*
@@ -185,7 +199,7 @@ void *connection_handler(void *socket_desc){
 				strcat(response, response_time);
 				strcat(response, response_miltime);	
 				strcat(response, "\n");
-	//			printf("Send Message:%s",response);
+				//printf("Send Message:%s",response);
 
 				write(socket, response, PKTLEN);
 			}
